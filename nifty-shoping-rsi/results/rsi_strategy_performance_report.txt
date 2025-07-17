@@ -1,0 +1,48 @@
+
+======================================================================
+🚀 NIFTY 50 RSI TRADING STRATEGY REPORT
+======================================================================
+Strategy: Nifty 50 RSI Strategy
+
+📊 PERFORMANCE SUMMARY:
+- Initial Capital: ₹400,000
+- Final Portfolio Value: ₹2,094,994
+- Total Self-Dividend: ₹125,229
+- Effective Final Value: ₹2,220,223
+
+📈 RETURNS:
+- Portfolio Return: 423.75%
+- Effective Return (incl. dividend): 455.06%
+- Annualized Return: 40.47%
+- Benchmark Return (Nifty 50): 124.96%
+- Excess Return: 298.79%
+
+🎯 TRADING STATISTICS:
+- Total Trades: 382
+- Profitable Trades: 342
+- Win Rate: 89.53%
+- RSI Entry Threshold: < 35
+- Profit Target: 6.28%
+
+💼 RISK MANAGEMENT:
+- Corona Stocks (Quarantined): 40
+- Active SIP Positions: 40
+- Final Active Positions: 19
+
+🏆 STRATEGY PARAMETERS:
+- RSI Period: 14
+- Position Size: ₹10,000
+- Tax Rate: 24.96%
+- Reinvestment Rate: 50%
+- Max Averaging Attempts: 7
+
+💡 KEY INSIGHTS:
+- Mathematical approach with Pi-based thresholds (3.14%, 6.28%)
+- Effective compounding through 50% reinvestment
+- Risk control through corona quarantine and SIP recovery
+- Tax-efficient profit booking with systematic dividend withdrawal
+
+======================================================================
+✅ RSI STRATEGY ANALYSIS COMPLETE
+======================================================================
+        
