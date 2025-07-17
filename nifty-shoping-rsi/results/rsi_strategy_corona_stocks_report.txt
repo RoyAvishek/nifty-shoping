@@ -1,0 +1,90 @@
+
+================================================================================
+🦠 CORONA STOCKS ANALYSIS - LONG TERM HOLD DUE TO SIP
+================================================================================
+
+Total Stocks Quarantined: 4
+
+STOCKS THAT ENTERED CORONA (SIP) PHASE:
+================================================================================
+
+ 1. BHARTIARTL
+    📅 Corona Date: 2020-09-24
+    💰 Entry Price: ₹525.50
+    📉 Corona Price: ₹411.55
+    📊 Loss Percentage: -21.7%
+    ⚠️  Reason: Loss > 20%
+    
+    🔄 SIP RECOVERY PLAN:
+    - Monthly Investment: 1/15th of total invested amount
+    - Duration: 15 months maximum
+    - Target: Recover to 6.28% profit before re-entering active trading
+    
+    ────────────────────────────────────────
+
+ 2. BPCL
+    📅 Corona Date: 2020-10-14
+    💰 Entry Price: ₹197.10
+    📉 Corona Price: ₹155.95
+    📊 Loss Percentage: -20.9%
+    ⚠️  Reason: Loss > 20%
+    
+    🔄 SIP RECOVERY PLAN:
+    - Monthly Investment: 1/15th of total invested amount
+    - Duration: 15 months maximum
+    - Target: Recover to 6.28% profit before re-entering active trading
+    
+    ────────────────────────────────────────
+
+ 3. HEROMOTOCO
+    📅 Corona Date: 2021-12-21
+    💰 Entry Price: ₹2811.95
+    📉 Corona Price: ₹2247.40
+    📊 Loss Percentage: -20.1%
+    ⚠️  Reason: Loss > 20%
+    
+    🔄 SIP RECOVERY PLAN:
+    - Monthly Investment: 1/15th of total invested amount
+    - Duration: 15 months maximum
+    - Target: Recover to 6.28% profit before re-entering active trading
+    
+    ────────────────────────────────────────
+
+ 4. HDFCLIFE
+    📅 Corona Date: 2023-03-15
+    💰 Entry Price: ₹587.75
+    📉 Corona Price: ₹466.70
+    📊 Loss Percentage: -20.6%
+    ⚠️  Reason: Loss > 20%
+    
+    🔄 SIP RECOVERY PLAN:
+    - Monthly Investment: 1/15th of total invested amount
+    - Duration: 15 months maximum
+    - Target: Recover to 6.28% profit before re-entering active trading
+    
+    ────────────────────────────────────────
+
+📊 CORONA PHASE STATISTICS:
+- Average Loss at Corona Entry: -20.8%
+- Worst Loss Recorded: -21.7%
+- Recovery Strategy: Systematic Investment Plan (SIP)
+- Risk Mitigation: Prevents total capital loss on declining stocks
+
+💡 CORONA RULE BENEFITS:
+✅ Prevents emotional decision making during steep declines
+✅ Systematic recovery approach through dollar-cost averaging
+✅ Preserves capital for other opportunities
+✅ Converts failing positions into long-term systematic investments
+
+⚖️ INTERPRETATION:
+Stocks in Corona phase represent positions that declined more than 20% from 
+average purchase price. Instead of booking large losses, the strategy converts 
+these into systematic investment plans for potential long-term recovery.
+
+The Corona rule is a key risk management feature that differentiates this 
+strategy from simple stop-loss approaches, providing a structured path for 
+recovery from significant declines.
+
+================================================================================
+🦠 END OF CORONA STOCKS ANALYSIS
+================================================================================
