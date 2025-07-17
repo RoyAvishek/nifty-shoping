@@ -15,23 +15,51 @@ This is the **optimal configuration** discovered through extensive backtesting:
 
 ### **Key Innovation - Enhanced Exit Logic:**
 
-#### **Phase 1: Reaching the Anchor (0% → 8%)**
-- Monitor position until it reaches **8% profit**
-- Once 8% is achieved, this becomes the **permanent minimum exit level**
+#### **Phase 1: Monitoring (0% → 8%)**
+- Monitor position until it reaches **8% profit trigger**
+- No exits allowed before reaching 8% (let winners run)
 
-#### **Phase 2: Trailing Above Anchor (8% → Higher)**
-- **Track highest high** achieved since reaching 8% anchor
+#### **Phase 2: Anchor Activation (8% reached)**
+- Once 8% is achieved, **activate 7% anchor** as permanent minimum exit level
+- This locks in at least 7% profit, providing downside protection
+
+#### **Phase 3: Trailing Above Anchor (7% floor + EMA trailing)**
+- **Track highest high** achieved since reaching 8% trigger
 - **Trail stop-loss** using 9-period EMA from current price
-- **Critical Rule**: Stop-loss NEVER drops below the 8% anchor price
+- **Critical Rule**: Stop-loss = `max(9-EMA, 7% anchor)` - NEVER drops below 7%
 - **Exit trigger**: When price closes below the EMA trailing stop
+
+**Key Difference:** The strategy uses an **8% trigger** to activate a **7% anchor**, ensuring you never exit below 7% profit once 8% is reached.
 
 ## Project Structure
 
-- `niftyshoping.py`: **Main enhanced strategy implementation** (8% Anchor + 9-EMA Trailing)
-- `historical_data/`: Contains historical Nifty 50 stock data
-- `results/`: Contains backtest outputs and performance reports
-  - `reports/`: Strategy analysis reports and optimization studies
-- `requirements.txt`: Python dependencies
+```
+NiftyShoping/
+├── 📊 niftyshoping_main.py          # 🚀 MAIN STRATEGY (RECOMMENDED)
+├── 📈 niftyshoping.py               # Alternative implementation
+├── 🔍 compare_configurations.py     # Strategy comparison tool
+├── 📋 quick_start_guide.py          # Usage guide and examples
+├── 📁 historical_data/              # Historical Nifty 50 stock data
+│   ├── nifty50_closing_prices_pivot.csv
+│   ├── nifty50_index_data.csv
+│   └── [Individual stock files]
+├── 📁 results/                      # Generated outputs
+│   ├── enhanced_strategy_dashboard.png
+│   ├── enhanced_strategy_trade_log.csv
+│   ├── enhanced_strategy_daily_results.csv
+│   └── enhanced_strategy_performance_report.txt
+├── 📄 README.md                     # This file
+└── 📄 requirements.txt              # Python dependencies
+```
+
+### 📚 **Script Functions:**
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| **`niftyshoping_main.py`** | 🚀 **Primary strategy implementation** with correct 7% anchor logic | **Use this for live trading** |
+| `niftyshoping.py` | Alternative implementation (8% anchor variant) | For comparison/testing |
+| `compare_configurations.py` | Compare multiple strategy variants side-by-side | Strategy analysis & optimization |
+| `quick_start_guide.py` | Display usage instructions and expected results | Quick reference guide |
 
 ## Performance Results
 
@@ -64,10 +92,22 @@ This is the **optimal configuration** discovered through extensive backtesting:
 
 ## How to Run the Enhanced Strategy
 
-Execute the main enhanced strategy script:
+Execute the **main enhanced strategy script** (recommended):
 
 ```bash
+python niftyshoping_main.py
+```
+
+**Alternative options:**
+```bash
+# Run the alternative implementation
 python niftyshoping.py
+
+# Compare different strategy configurations
+python compare_configurations.py
+
+# View quick start guide
+python quick_start_guide.py
 ```
 
 The script will:
@@ -75,6 +115,17 @@ The script will:
 2. Run the enhanced 8% Anchor + 9-EMA Trailing Stop strategy
 3. Generate performance reports and trade logs
 4. Save results to the `results/` directory
+
+### 🔄 **Execution Flow:**
+
+```
+1. 📊 Load Data → historical_data/nifty50_closing_prices_pivot.csv
+2. 🔍 Calculate → 20-day moving averages + 9-period EMA
+3. 🎯 Entry Logic → Find 5 stocks furthest below 20-DMA, buy 2
+4. 🚪 Exit Logic → 8% trigger → 7% anchor → 9-EMA trailing
+5. 📈 Generate → Visualizations, trade logs, performance reports
+6. 💾 Save → results/ folder (CSV, PNG, TXT files)
+```
 
 ## Expected Performance
 
@@ -96,3 +147,17 @@ Based on historical backtesting (July 2020 - July 2025):
 ## Ready for Implementation
 
 This strategy is **optimized and ready for deployment** with proven historical performance and comprehensive risk management.
+
+### 🗂️ **Script Recommendations:**
+
+**✅ KEEP THESE:**
+- **`niftyshoping_main.py`** - Primary strategy (most complete implementation)
+- `compare_configurations.py` - Useful for strategy analysis
+- `quick_start_guide.py` - Helpful reference guide
+- `historical_data/` folder - Required data files
+- `requirements.txt` - Python dependencies
+
+**🤔 OPTIONAL:**
+- `niftyshoping.py` - Keep if you want an alternative implementation for testing
+
+**🎯 FOR LIVE TRADING:** Use `niftyshoping_main.py` - it has the correct logic and comprehensive features.
