@@ -204,6 +204,7 @@ class EnhancedRSIStrategyV2:
             
             # Check exit conditions first
             stocks_to_sell = []
+            stocks_to_quarantine = []
             for stock, holdings in portfolio.items():
                 if stock in stock_data:
                     try:
@@ -211,167 +212,121 @@ class EnhancedRSIStrategyV2:
                         if pd.notna(current_price):
                             current_return = (current_price - holdings['avg_price']) / holdings['avg_price']
                             
-                            # Profit target (6.28%)
+                            # Profit target (6.28%) - SELL for profit
                             if current_return >= self.profit_target:
                                 stocks_to_sell.append((stock, current_return, 'PROFIT'))
                             
-                            # Enhanced corona condition (22.5%)
-                            elif current_return <= -self.corona_threshold:
-                                if stock not in corona_stocks:
-                                    corona_stocks.add(stock)
-                                    stocks_to_sell.append((stock, current_return, 'CORONA'))
+                            # Enhanced corona condition (22.5%) - QUARANTINE only (don't sell)
+                            elif current_return <= -self.corona_threshold and stock not in corona_stocks:
+                                stocks_to_quarantine.append((stock, current_return, 'CORONA'))
                     except:
                         continue
             
-            # Execute sells
-            for stock, return_pct, reason in stocks_to_sell:
+            # Quarantine stocks (don't sell, just mark as quarantined)
+            for stock, return_pct, reason in stocks_to_quarantine:
                 if stock in portfolio:
+                    corona_stocks.add(stock)  # Mark as quarantined
+                    holdings = portfolio[stock]
+                    current_price = stock_data[stock].loc[date, 'close']
+                    
+                    # Record quarantine event but DON'T sell
+                    monthly_trades[month_key]['corona'] += 1
+                    
+                    # Add detailed corona info
+                    corona_details = {
+                        'stock': stock,
+                        'buy_price': holdings['avg_price'],
+                        'current_price': current_price,
+                        'quantity': holdings['quantity'],
+                        'unrealized_loss': (holdings['quantity'] * current_price) - holdings['total_invested'],
+                        'return_pct': return_pct * 100,
+                        'buy_date': holdings.get('first_buy_date'),
+                        'quarantine_date': date,
+                        'hold_days': (date - holdings.get('first_buy_date', date)).days,
+                        'invested': holdings['total_invested'],
+                        'current_value': holdings['quantity'] * current_price,
+                        'reason': f'QUARANTINED (Return: {return_pct*100:.2f}% <= {-self.corona_threshold*100:.2f}%)'
+                    }
+                    monthly_trades[month_key]['detailed_corona'].append(corona_details)
+                    
+                    trade_log.append({
+                        'date': date,
+                        'action': 'QUARANTINE',
+                        'stock': stock,
+                        'price': current_price,
+                        'return': return_pct,
+                        'reason': 'CORONA_QUARANTINE',
+                        'unrealized_loss': (holdings['quantity'] * current_price) - holdings['total_invested'],
+                        'profit_pct': return_pct * 100,
+                        'hold_days': (date - holdings.get('first_buy_date', date)).days,
+                        'cash_after': cash,  # Cash unchanged
+                        'position_size_after': current_position_size
+                    })
+                    # Stock remains in portfolio - NOT deleted
+            
+            # Execute profit sales (only profitable trades are sold)
+            for stock, return_pct, reason in stocks_to_sell:
+                if stock in portfolio and reason == 'PROFIT':
                     holdings = portfolio[stock]
                     current_price = stock_data[stock].loc[date, 'close']
                     
                     gross_proceeds = holdings['quantity'] * current_price
+                    profit = gross_proceeds - holdings['total_invested']
+                    tax = profit * self.tax_rate
+                    net_proceeds = gross_proceeds - tax
+                    cash += net_proceeds
                     
-                    if return_pct > 0:  # Profitable trade
-                        profit = gross_proceeds - holdings['total_invested']
-                        tax = profit * self.tax_rate
-                        net_proceeds = gross_proceeds - tax
-                        cash += net_proceeds
-                        
-                        # CRITICAL: Increase position size for compounding
-                        # This is the key mechanism that creates exponential growth!
-                        # Position size grows with FULL net profit (not divided by number of positions)
-                        net_profit = net_proceeds - holdings['total_invested']
-                        current_position_size += net_profit
-                        
-                        monthly_trades[month_key]['profit'] += profit
-                        monthly_trades[month_key]['exits'] += 1
-                        
-                        # Add detailed exit info
-                        exit_details = {
-                            'stock': stock,
-                            'buy_price': holdings['avg_price'],
-                            'sell_price': current_price,
-                            'quantity': holdings['quantity'],
-                            'profit': profit,
-                            'return_pct': return_pct * 100,
-                            'buy_date': holdings.get('first_buy_date'),
-                            'sell_date': date,
-                            'hold_days': (date - holdings.get('first_buy_date', date)).days,
-                            'tax': tax,
-                            'invested': holdings['total_invested'],
-                            'gross': gross_proceeds,
-                            'net': net_proceeds,
-                            'reason': f'PROFIT_TARGET (Return: {return_pct*100:.2f}% >= {self.profit_target*100:.2f}%)'
-                        }
-                        monthly_trades[month_key]['detailed_exits'].append(exit_details)
-                        
-                    else:  # Corona trade
-                        cash += gross_proceeds
-                        monthly_trades[month_key]['profit'] += (gross_proceeds - holdings['total_invested'])
-                        monthly_trades[month_key]['corona'] += 1
-                        
-                        # Add detailed corona info
-                        corona_details = {
-                            'stock': stock,
-                            'buy_price': holdings['avg_price'],
-                            'sell_price': current_price,
-                            'quantity': holdings['quantity'],
-                            'loss': gross_proceeds - holdings['total_invested'],
-                            'return_pct': return_pct * 100,
-                            'buy_date': holdings.get('first_buy_date'),
-                            'sell_date': date,
-                            'hold_days': (date - holdings.get('first_buy_date', date)).days,
-                            'invested': holdings['total_invested'],
-                            'gross': gross_proceeds,
-                            'reason': f'CORONA_EXIT (Return: {return_pct*100:.2f}% <= {-self.corona_threshold*100:.2f}%)'
-                        }
-                        monthly_trades[month_key]['detailed_corona'].append(corona_details)
+                    # CRITICAL: Increase position size for compounding
+                    # This is the key mechanism that creates exponential growth!
+                    net_profit = net_proceeds - holdings['total_invested']
+                    current_position_size += net_profit
                     
+                    monthly_trades[month_key]['profit'] += profit
+                    monthly_trades[month_key]['exits'] += 1
                     monthly_trades[month_key]['sells'] += 1
+                    
+                    # Add detailed exit info
+                    exit_details = {
+                        'stock': stock,
+                        'buy_price': holdings['avg_price'],
+                        'sell_price': current_price,
+                        'quantity': holdings['quantity'],
+                        'profit': profit,
+                        'return_pct': return_pct * 100,
+                        'buy_date': holdings.get('first_buy_date'),
+                        'sell_date': date,
+                        'hold_days': (date - holdings.get('first_buy_date', date)).days,
+                        'tax': tax,
+                        'invested': holdings['total_invested'],
+                        'gross': gross_proceeds,
+                        'net': net_proceeds,
+                        'reason': f'PROFIT_TARGET (Return: {return_pct*100:.2f}% >= {self.profit_target*100:.2f}%)'
+                    }
+                    monthly_trades[month_key]['detailed_exits'].append(exit_details)
                     
                     trade_log.append({
                         'date': date,
-                        'action': f'SELL_{reason}',
+                        'action': 'SELL_PROFIT',
                         'stock': stock,
                         'price': current_price,
                         'return': return_pct,
-                        'reason': reason,
-                        'profit': gross_proceeds - holdings['total_invested'],
+                        'reason': 'PROFIT',
+                        'profit': profit,
                         'profit_pct': return_pct * 100,
                         'hold_days': (date - holdings.get('first_buy_date', date)).days,
                         'cash_after': cash,
                         'position_size_after': current_position_size
                     })
                     
-                    if reason != 'CORONA':
-                        del portfolio[stock]
+                    # Remove profitable stock from portfolio
+                    del portfolio[stock]
             
-            # Entry logic - find RSI candidates
-            rsi_candidates = []
-            for stock, data in stock_data.items():
-                if stock not in portfolio and stock not in corona_stocks:
-                    try:
-                        current_rsi = data.loc[date, 'rsi']
-                        if pd.notna(current_rsi) and current_rsi < self.entry_rsi:
-                            rsi_candidates.append((stock, current_rsi))
-                    except:
-                        continue
-            
-            # Buy new stock (lowest RSI first)
-            if rsi_candidates and cash >= self.min_position_size:
-                rsi_candidates.sort(key=lambda x: x[1])  # Sort by RSI (lowest first)
-                stock_to_buy, rsi_value = rsi_candidates[0]
-                
-                try:
-                    entry_price = stock_data[stock_to_buy].loc[date, 'close']
-                    if pd.notna(entry_price) and entry_price > 0:
-                        # Calculate shares and investment amount
-                        quantity, investment_amount = self.calculate_investment_amount(entry_price, current_position_size)
-                        
-                        if quantity > 0 and investment_amount <= cash:
-                            portfolio[stock_to_buy] = {
-                                'quantity': quantity,
-                                'avg_price': entry_price,
-                                'total_invested': investment_amount,
-                                'averaging_attempts': 0,
-                                'first_buy_date': date
-                            }
-                            
-                            cash -= investment_amount
-                            monthly_trades[month_key]['buys'] += 1
-                            monthly_trades[month_key]['new_entries'] += 1
-                            monthly_trades[month_key]['invested'] += investment_amount
-                            
-                            # Add detailed entry info
-                            entry_details = {
-                                'stock': stock_to_buy,
-                                'entry_price': entry_price,
-                                'quantity': quantity,
-                                'amount': investment_amount,
-                                'date': date,
-                                'rsi': rsi_value,
-                                'reason': f'NEW_ENTRY (RSI: {rsi_value:.2f} < {self.entry_rsi})'
-                            }
-                            monthly_trades[month_key]['detailed_entries'].append(entry_details)
-                            
-                            trade_log.append({
-                                'date': date,
-                                'action': 'BUY',
-                                'stock': stock_to_buy,
-                                'price': entry_price,
-                                'return': 0,
-                                'reason': 'NEW_ENTRY',
-                                'amount': investment_amount,
-                                'cash_after': cash
-                            })
-                except:
-                    continue
-            
-            # Averaging logic (Enhanced V2 conditions)
-            elif portfolio and cash >= self.min_position_size:
+            # PRIORITY 1: Averaging logic (Enhanced V2 conditions) - Check first!
+            averaging_done = False
+            if portfolio and cash >= self.min_position_size:
                 averaging_candidates = []
                 for stock, holdings in portfolio.items():
-                    if (stock in stock_data and 
+                    if (stock in stock_data and stock not in corona_stocks and 
                         holdings['averaging_attempts'] < self.max_averaging_attempts):
                         
                         # Check each averaging condition level
@@ -387,7 +342,7 @@ class EnhancedRSIStrategyV2:
                                 except:
                                     continue
                 
-                # Average down on best candidate
+                # Average down on best candidate (lowest RSI)
                 if averaging_candidates:
                     averaging_candidates.sort(key=lambda x: x[1])  # Sort by RSI
                     stock_to_average, rsi_value, level = averaging_candidates[0]
@@ -426,7 +381,7 @@ class EnhancedRSIStrategyV2:
                                     'date': date,
                                     'rsi': rsi_value,
                                     'level': level + 1,
-                                    'reason': f'V2_LEVEL_{level+1}'
+                                    'reason': f'V2_LEVEL_{level+1} (RSI: {rsi_value:.2f}, Level: {level+1})'
                                 }
                                 monthly_trades[month_key]['detailed_averaging'].append(avg_details)
                                 
@@ -436,9 +391,75 @@ class EnhancedRSIStrategyV2:
                                     'stock': stock_to_average,
                                     'price': entry_price,
                                     'return': 0,
-                                    'reason': f'V2_LEVEL_{level+1}',
+                                    'reason': f'AVERAGING_V2_L{level+1}',
                                     'amount': investment_amount,
-                                    'cash_after': cash
+                                    'level': level + 1,
+                                    'cash_after': cash,
+                                    'position_size_after': current_position_size
+                                })
+                                averaging_done = True
+                    except:
+                        continue
+            
+            # PRIORITY 2: Entry logic - find RSI candidates (only if no averaging done)
+            if not averaging_done and cash >= self.min_position_size:
+                rsi_candidates = []
+                for stock, data in stock_data.items():
+                    if stock not in portfolio and stock not in corona_stocks:
+                        try:
+                            current_rsi = data.loc[date, 'rsi']
+                            if pd.notna(current_rsi) and current_rsi < self.entry_rsi:
+                                rsi_candidates.append((stock, current_rsi))
+                        except:
+                            continue
+                
+                # Buy new stock (lowest RSI first)
+                if rsi_candidates:
+                    rsi_candidates.sort(key=lambda x: x[1])  # Sort by RSI (lowest first)
+                    stock_to_buy, rsi_value = rsi_candidates[0]
+                    
+                    try:
+                        entry_price = stock_data[stock_to_buy].loc[date, 'close']
+                        if pd.notna(entry_price) and entry_price > 0:
+                            # Calculate shares and investment amount
+                            quantity, investment_amount = self.calculate_investment_amount(entry_price, current_position_size)
+                            
+                            if quantity > 0 and investment_amount <= cash:
+                                portfolio[stock_to_buy] = {
+                                    'quantity': quantity,
+                                    'avg_price': entry_price,
+                                    'total_invested': investment_amount,
+                                    'averaging_attempts': 0,
+                                    'first_buy_date': date
+                                }
+                                
+                                cash -= investment_amount
+                                monthly_trades[month_key]['buys'] += 1
+                                monthly_trades[month_key]['new_entries'] += 1
+                                monthly_trades[month_key]['invested'] += investment_amount
+                                
+                                # Add detailed entry info
+                                entry_details = {
+                                    'stock': stock_to_buy,
+                                    'entry_price': entry_price,
+                                    'quantity': quantity,
+                                    'amount': investment_amount,
+                                    'date': date,
+                                    'rsi': rsi_value,
+                                    'reason': f'NEW_ENTRY (RSI: {rsi_value:.2f} < {self.entry_rsi})'
+                                }
+                                monthly_trades[month_key]['detailed_entries'].append(entry_details)
+                                
+                                trade_log.append({
+                                    'date': date,
+                                    'action': 'BUY',
+                                    'stock': stock_to_buy,
+                                    'price': entry_price,
+                                    'return': 0,
+                                    'reason': 'NEW_ENTRY',
+                                    'amount': investment_amount,
+                                    'cash_after': cash,
+                                    'position_size_after': current_position_size
                                 })
                     except:
                         continue
