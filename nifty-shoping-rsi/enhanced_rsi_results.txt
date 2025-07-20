@@ -1,0 +1,96 @@
+================================================================================
+🚀 ENHANCED RSI STRATEGY V2 - BACKTEST RESULTS
+================================================================================
+
+📊 PERFORMANCE SUMMARY:
+━━━━━━━━━━━━━━━━━━━━━━━━
+Initial Capital      : ₹400,000
+Final Portfolio Value : ₹114,520,913
+Total Return          : 28,530.2%
+Active Positions      : 0
+Available Cash        : ₹114,520,913
+Final Position Size   : ₹114,130,913
+
+🎯 TRADING STATISTICS:
+━━━━━━━━━━━━━━━━━━━━━━━━
+Total Trades          : 174
+Profitable Trades     : 174
+Corona Trades         : 0
+Corona Stocks         : 0
+Win Rate              : 100.0%
+
+📅 MONTH-BY-MONTH TRADE ANALYSIS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2020-07: 11 buys, 4 sells, ₹110,255 invested, ₹2,916 profit
+2020-08: 19 buys, 17 sells, ₹405,289 invested, ₹21,544 profit
+2020-09: 17 buys, 16 sells, ₹720,212 invested, ₹40,897 profit
+2020-10: 10 buys, 16 sells, ₹891,409 invested, ₹73,392 profit
+2020-11: 11 buys, 13 sells, ₹1,798,065 invested, ₹151,041 profit
+2020-12: 5 buys, 5 sells, ₹1,323,599 invested, ₹83,871 profit
+2021-01: 5 buys, 6 sells, ₹1,778,249 invested, ₹207,479 profit
+2021-02: 4 buys, 4 sells, ₹2,108,660 invested, ₹184,367 profit
+2021-03: 3 buys, 3 sells, ₹1,945,048 invested, ₹132,190 profit
+2021-04: 2 buys, 2 sells, ₹1,503,815 invested, ₹122,741 profit
+2021-05: 3 buys, 3 sells, ₹2,597,901 invested, ₹185,274 profit
+2021-06: 3 buys, 3 sells, ₹3,049,661 invested, ₹217,983 profit
+2021-07: 3 buys, 3 sells, ₹3,661,032 invested, ₹281,857 profit
+2021-08: 3 buys, 3 sells, ₹4,338,968 invested, ₹300,240 profit
+2021-09: 3 buys, 3 sells, ₹5,099,532 invested, ₹383,850 profit
+2021-10: 4 buys, 4 sells, ₹8,142,477 invested, ₹520,698 profit
+2021-11: 3 buys, 3 sells, ₹7,456,349 invested, ₹612,653 profit
+2021-12: 1 buys, 1 sells, ₹2,780,403 invested, ₹168,938 profit
+2022-01: 3 buys, 3 sells, ₹9,382,833 invested, ₹722,720 profit
+2022-02: 2 buys, 2 sells, ₹7,232,707 invested, ₹547,760 profit
+2022-03: 3 buys, 3 sells, ₹12,558,920 invested, ₹964,598 profit
+2022-04: 2 buys, 2 sells, ₹9,714,578 invested, ₹708,530 profit
+2022-05: 2 buys, 3 sells, ₹10,807,929 invested, ₹1,367,232 profit
+2022-06: 2 buys, 1 sells, ₹12,356,221 invested, ₹441,441 profit
+2022-07: 4 buys, 4 sells, ₹29,043,285 invested, ₹1,980,311 profit
+2022-08: 1 buys, 1 sells, ₹8,297,114 invested, ₹619,083 profit
+2022-09: 1 buys, 1 sells, ₹8,801,707 invested, ₹673,456 profit
+2023-07: 3 buys, 3 sells, ₹29,862,851 invested, ₹2,658,041 profit
+2023-08: 2 buys, 2 sells, ₹23,287,176 invested, ₹1,520,940 profit
+2023-09: 1 buys, 1 sells, ₹12,535,896 invested, ₹796,544 profit
+2023-10: 2 buys, 2 sells, ₹27,247,036 invested, ₹1,987,775 profit
+2023-11: 2 buys, 2 sells, ₹30,719,106 invested, ₹2,268,891 profit
+2023-12: 3 buys, 3 sells, ₹52,137,084 invested, ₹3,487,812 profit
+2024-01: 3 buys, 3 sells, ₹61,496,711 invested, ₹4,354,209 profit
+2024-02: 2 buys, 2 sells, ₹47,334,851 invested, ₹3,480,055 profit
+2024-03: 2 buys, 2 sells, ₹52,496,458 invested, ₹3,668,512 profit
+2024-04: 2 buys, 2 sells, ₹58,641,176 invested, ₹4,096,964 profit
+2024-05: 2 buys, 2 sells, ₹65,357,485 invested, ₹4,976,328 profit
+2024-06: 2 buys, 2 sells, ₹72,977,218 invested, ₹4,933,815 profit
+2024-07: 3 buys, 3 sells, ₹125,627,790 invested, ₹9,204,340 profit
+2024-08: 2 buys, 2 sells, ₹95,531,860 invested, ₹6,030,929 profit
+2024-09: 2 buys, 2 sells, ₹109,200,246 invested, ₹9,904,083 profit
+2024-10: 3 buys, 3 sells, ₹193,600,257 invested, ₹15,981,047 profit
+2024-11: 1 buys, 1 sells, ₹72,190,425 invested, ₹5,121,945 profit
+2025-03: 1 buys, 1 sells, ₹75,615,629 invested, ₹4,565,622 profit
+2025-04: 3 buys, 3 sells, ₹256,090,691 invested, ₹20,817,022 profit
+2025-05: 1 buys, 1 sells, ₹97,586,068 invested, ₹8,460,830 profit
+2025-06: 2 buys, 2 sells, ₹212,325,188 invested, ₹15,110,880 profit
+2025-07: 0 buys, 1 sells, ₹0 invested, ₹6,936,462 profit
+
+📈 RECENT TRADES (Last 10):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2024-10-31 | LT | SELL_PROFIT | ₹3622.30 | Profit: 8.90% | PROFIT
+2024-11-22 | HCLTECH | SELL_PROFIT | ₹1898.40 | Profit: 7.49% | PROFIT
+2025-03-17 | TATASTEEL | SELL_PROFIT | ₹151.81 | Profit: 6.32% | PROFIT
+2025-04-08 | ASIANPAINT | SELL_PROFIT | ₹2394.20 | Profit: 7.87% | PROFIT
+2025-04-17 | RELIANCE | SELL_PROFIT | ₹1274.50 | Profit: 7.81% | PROFIT
+2025-04-23 | TECHM | SELL_PROFIT | ₹1439.60 | Profit: 10.16% | PROFIT
+2025-05-12 | TECHM | SELL_PROFIT | ₹1573.10 | Profit: 9.27% | PROFIT
+2025-06-05 | DRREDDY | SELL_PROFIT | ₹1290.60 | Profit: 7.95% | PROFIT
+2025-06-19 | WIPRO | SELL_PROFIT | ₹265.58 | Profit: 7.11% | PROFIT
+2025-07-04 | DIVISLAB | SELL_PROFIT | ₹6906.50 | Profit: 6.37% | PROFIT
+
+💰 CURRENT PORTFOLIO (0 positions):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+No active positions
+================================================================================
+🎯 KEY INSIGHTS:
+- Position size grew from ₹10,000 to ₹114,130,913
+- This 11413.1x position growth drives exponential returns
+- Corona threshold (22.5%) proved optimal with only 0 corona stocks
+- Strategy maintained 100.0% win rate through disciplined profit booking
+================================================================================
