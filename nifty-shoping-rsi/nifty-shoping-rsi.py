@@ -40,6 +40,13 @@ class EnhancedRSIStrategyV2:
         self.tax_rate = 0.2496  # 20% STCG + 4% cess
         self.max_averaging_attempts = 10
         
+        # Trading costs (realistic Indian market costs)
+        self.brokerage_rate = 0.0003  # 0.03% (₹20 per trade, whichever is lower)
+        self.stt_rate = 0.00025  # 0.025% on sell side for equity delivery
+        self.stamp_duty = 0.00015  # 0.015% on buy side
+        self.gst_rate = 0.18  # 18% GST on brokerage
+        self.slippage_rate = 0.001  # 0.1% slippage (market impact)
+        
         # Enhanced V2 averaging conditions (exact match with original)
         self.averaging_conditions = [
             {'rsi': 30, 'price_drop': 0.03},  # Level 1: RSI<30 AND 3% drop
@@ -51,24 +58,81 @@ class EnhancedRSIStrategyV2:
         ]
     
     def calculate_rsi(self, prices, period=14):
-        """Calculate RSI indicator"""
         delta = prices.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
+        gain = delta.where(delta > 0, 0.0)
+        loss = -delta.where(delta < 0, 0.0)
+        avg_gain = gain.ewm(alpha=1/period, min_periods=period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1/period, min_periods=period, adjust=False).mean()
+        rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
         return rsi
     
-    def calculate_investment_amount(self, price, target_position_size):
-        """Calculate investment amount based on whole shares and position limits"""
+    def calculate_trading_costs(self, transaction_value, is_buy=True):
+        """Calculate realistic trading costs for Indian equity markets"""
+        # Brokerage (₹20 or 0.03% whichever is lower)
+        brokerage = min(20, transaction_value * self.brokerage_rate)
+        
+        # STT (only on sell side for equity delivery)
+        stt = transaction_value * self.stt_rate if not is_buy else 0
+        
+        # Stamp duty (only on buy side)
+        stamp_duty = transaction_value * self.stamp_duty if is_buy else 0
+        
+        # GST on brokerage
+        gst = brokerage * self.gst_rate
+        
+        # Slippage (market impact)
+        slippage = transaction_value * self.slippage_rate
+        
+        total_costs = brokerage + stt + stamp_duty + gst + slippage
+        
+        return {
+            'brokerage': brokerage,
+            'stt': stt,
+            'stamp_duty': stamp_duty,
+            'gst': gst,
+            'slippage': slippage,
+            'total': total_costs
+        }
+    
+    def calculate_free_capital(self, cash, portfolio, stock_data, current_date):
+        """Calculate free capital available for new investments"""
+        # Free capital = Cash - locked capital in open positions
+        locked_capital = sum([holdings['total_invested'] for holdings in portfolio.values()])
+        free_capital = cash - locked_capital
+        
+        # Note: We don't count unrealized profits as available capital
+        # Only realized profits (already in cash) are available for reinvestment
+        
+        return max(0, free_capital)
+    
+    def calculate_position_size_based_on_realized_profits(self, initial_position_size, total_realized_profits):
+        """Calculate position size based only on REALIZED profits"""
+        # Position size grows only with realized profits, not unrealized
+        # This ensures we never invest money we don't actually have
+        
+        if total_realized_profits <= 0:
+            return initial_position_size
+        
+        # Conservative growth: base position + 50% of realized profits
+        # This ensures we always have sufficient capital buffer
+        enhanced_position_size = initial_position_size + (total_realized_profits * 0.5)
+        
+        # Apply reasonable limits to prevent excessive position sizes
+        max_reasonable_position = initial_position_size * 10  # 10x max growth per position
+        
+        return min(enhanced_position_size, max_reasonable_position)
+    def calculate_investment_amount(self, price, target_position_size, available_free_capital):
+        """Calculate investment amount based on free capital and position limits"""
+        # Ensure we never exceed available free capital
+        max_investable = min(target_position_size, available_free_capital)
+        
         # For initial trades, apply position size limits (10K-15K)
-        # But for exponential growth, allow position size to grow beyond 15K
         if target_position_size <= self.max_position_size:
-            # Initial phase - apply limits
-            target_position = max(self.min_position_size, min(self.max_position_size, target_position_size))
+            target_position = max(self.min_position_size, min(self.max_position_size, max_investable))
         else:
-            # Growth phase - let it grow exponentially but ensure minimum
-            target_position = max(self.min_position_size, target_position_size)
+            # Growth phase - but still limited by free capital
+            target_position = max(self.min_position_size, max_investable)
         
         # Calculate whole number of shares
         shares = int(target_position / price)
@@ -78,9 +142,24 @@ class EnhancedRSIStrategyV2:
             shares = 1
         
         # Calculate actual investment amount
-        investment_amount = shares * price
+        gross_investment = shares * price
         
-        return shares, investment_amount
+        # Calculate trading costs
+        costs = self.calculate_trading_costs(gross_investment, is_buy=True)
+        total_required = gross_investment + costs['total']
+        
+        # Check if we have enough free capital including costs
+        if total_required <= available_free_capital:
+            return shares, gross_investment, costs
+        else:
+            # Reduce shares to fit within available capital
+            affordable_shares = int((available_free_capital * 0.95) / (price * (1 + 0.002)))  # 0.2% buffer for costs
+            if affordable_shares > 0:
+                gross_investment = affordable_shares * price
+                costs = self.calculate_trading_costs(gross_investment, is_buy=True)
+                return affordable_shares, gross_investment, costs
+            else:
+                return 0, 0, {'total': 0, 'brokerage': 0, 'stt': 0, 'stamp_duty': 0, 'gst': 0, 'slippage': 0}
     
     def load_stock_data(self):
         """Load all Nifty 50 historical data"""
@@ -144,14 +223,15 @@ class EnhancedRSIStrategyV2:
             return False
     
     def simulate_strategy(self, stock_data):
-        """Simulate the enhanced V2 strategy with position size limits"""
+        """Simulate the enhanced V2 strategy with PROPER capital management"""
         portfolio = {}
         corona_stocks = set()
         cash = self.initial_capital
-        current_position_size = self.position_size  # This grows with profits!
+        total_realized_profits = 0  # Track only REALIZED profits for position sizing
+        total_trading_costs = 0  # Track total costs incurred
         trade_log = []
         monthly_trades = {}
-        monthly_portfolios = {}  # To store portfolio status at month end
+        monthly_portfolios = {}
         
         # Get common trading dates
         all_dates = None
@@ -260,7 +340,9 @@ class EnhancedRSIStrategyV2:
                         'profit_pct': return_pct * 100,
                         'hold_days': (date - holdings.get('first_buy_date', date)).days,
                         'cash_after': cash,  # Cash unchanged
-                        'position_size_after': current_position_size
+                        'position_size_after': self.calculate_position_size_based_on_realized_profits(
+                            self.position_size, total_realized_profits
+                        )
                     })
                     # Stock remains in portfolio - NOT deleted
             
@@ -270,39 +352,58 @@ class EnhancedRSIStrategyV2:
                     holdings = portfolio[stock]
                     current_price = stock_data[stock].loc[date, 'close']
                     
+                    # Calculate gross proceeds
                     gross_proceeds = holdings['quantity'] * current_price
-                    profit = gross_proceeds - holdings['total_invested']
-                    tax = profit * self.tax_rate
-                    net_proceeds = gross_proceeds - tax
+                    
+                    # Calculate trading costs for selling
+                    sell_costs = self.calculate_trading_costs(gross_proceeds, is_buy=False)
+                    
+                    # Calculate taxes and net proceeds
+                    gross_profit = gross_proceeds - holdings['total_invested']
+                    tax = gross_profit * self.tax_rate
+                    net_proceeds = gross_proceeds - sell_costs['total'] - tax
+                    
+                    # CRITICAL CHANGE: Only add to cash and realized profits
+                    # No longer add to "position size" - that's based on realized profits
                     cash += net_proceeds
                     
-                    # CRITICAL: Increase position size for compounding
-                    # This is the key mechanism that creates exponential growth!
-                    net_profit = net_proceeds - holdings['total_invested']
-                    current_position_size += net_profit
+                    # Track REALIZED profit (net of all costs and taxes)
+                    realized_profit = net_proceeds - holdings['total_invested']
+                    total_realized_profits += realized_profit
+                    total_trading_costs += sell_costs['total']
                     
-                    monthly_trades[month_key]['profit'] += profit
+                    # Free up the locked capital (this position is now closed)
+                    # The invested amount is already accounted for in cash via net_proceeds
+                    
+                    monthly_trades[month_key]['profit'] += gross_profit
                     monthly_trades[month_key]['exits'] += 1
                     monthly_trades[month_key]['sells'] += 1
                     
-                    # Add detailed exit info
+                    # Add detailed exit info with proper cost breakdown
                     exit_details = {
                         'stock': stock,
                         'buy_price': holdings['avg_price'],
                         'sell_price': current_price,
                         'quantity': holdings['quantity'],
-                        'profit': profit,
+                        'gross_profit': gross_profit,
+                        'realized_profit': realized_profit,
                         'return_pct': return_pct * 100,
                         'buy_date': holdings.get('first_buy_date'),
                         'sell_date': date,
                         'hold_days': (date - holdings.get('first_buy_date', date)).days,
                         'tax': tax,
+                        'trading_costs': sell_costs,
                         'invested': holdings['total_invested'],
-                        'gross': gross_proceeds,
-                        'net': net_proceeds,
+                        'gross_proceeds': gross_proceeds,
+                        'net_proceeds': net_proceeds,
                         'reason': f'PROFIT_TARGET (Return: {return_pct*100:.2f}% >= {self.profit_target*100:.2f}%)'
                     }
                     monthly_trades[month_key]['detailed_exits'].append(exit_details)
+                    
+                    # Calculate current position size based on realized profits
+                    current_position_size = self.calculate_position_size_based_on_realized_profits(
+                        self.position_size, total_realized_profits
+                    )
                     
                     trade_log.append({
                         'date': date,
@@ -311,10 +412,13 @@ class EnhancedRSIStrategyV2:
                         'price': current_price,
                         'return': return_pct,
                         'reason': 'PROFIT',
-                        'profit': profit,
+                        'gross_profit': gross_profit,
+                        'realized_profit': realized_profit,
                         'profit_pct': return_pct * 100,
                         'hold_days': (date - holdings.get('first_buy_date', date)).days,
+                        'trading_costs': sell_costs['total'],
                         'cash_after': cash,
+                        'total_realized_profits': total_realized_profits,
                         'position_size_after': current_position_size
                     })
                     
@@ -323,7 +427,14 @@ class EnhancedRSIStrategyV2:
             
             # PRIORITY 1: Averaging logic (Enhanced V2 conditions) - Check first!
             averaging_done = False
-            if portfolio and cash >= self.min_position_size:
+            
+            # Calculate free capital available for new investments
+            free_capital = self.calculate_free_capital(cash, portfolio, stock_data, date)
+            current_position_size = self.calculate_position_size_based_on_realized_profits(
+                self.position_size, total_realized_profits
+            )
+            
+            if portfolio and free_capital >= self.min_position_size:
                 averaging_candidates = []
                 for stock, holdings in portfolio.items():
                     if (stock in stock_data and stock not in corona_stocks and 
@@ -350,13 +461,17 @@ class EnhancedRSIStrategyV2:
                     try:
                         entry_price = stock_data[stock_to_average].loc[date, 'close']
                         if pd.notna(entry_price) and entry_price > 0:
-                            # Calculate shares and investment amount
-                            new_shares, investment_amount = self.calculate_investment_amount(entry_price, current_position_size)
+                            # Calculate shares and investment using free capital
+                            new_shares, investment_amount, buy_costs = self.calculate_investment_amount(
+                                entry_price, current_position_size, free_capital
+                            )
                             
-                            if new_shares > 0 and investment_amount <= cash:
+                            total_cost = investment_amount + buy_costs['total']
+                            
+                            if new_shares > 0 and total_cost <= free_capital:
                                 holdings = portfolio[stock_to_average]
                                 total_quantity = holdings['quantity'] + new_shares
-                                total_invested = holdings['total_invested'] + investment_amount
+                                total_invested = holdings['total_invested'] + total_cost  # Include costs
                                 new_avg_price = total_invested / total_quantity
                                 
                                 portfolio[stock_to_average] = {
@@ -367,17 +482,21 @@ class EnhancedRSIStrategyV2:
                                     'first_buy_date': holdings['first_buy_date']
                                 }
                                 
-                                cash -= investment_amount
+                                cash -= total_cost  # Deduct total cost including trading costs
+                                total_trading_costs += buy_costs['total']
+                                
                                 monthly_trades[month_key]['buys'] += 1
                                 monthly_trades[month_key]['averaging'] += 1
-                                monthly_trades[month_key]['invested'] += investment_amount
+                                monthly_trades[month_key]['invested'] += total_cost
                                 
                                 # Add detailed averaging info
                                 avg_details = {
                                     'stock': stock_to_average,
                                     'entry_price': entry_price,
                                     'quantity': new_shares,
-                                    'amount': investment_amount,
+                                    'gross_amount': investment_amount,
+                                    'trading_costs': buy_costs,
+                                    'total_cost': total_cost,
                                     'date': date,
                                     'rsi': rsi_value,
                                     'level': level + 1,
@@ -392,9 +511,12 @@ class EnhancedRSIStrategyV2:
                                     'price': entry_price,
                                     'return': 0,
                                     'reason': f'AVERAGING_V2_L{level+1}',
-                                    'amount': investment_amount,
+                                    'gross_amount': investment_amount,
+                                    'trading_costs': buy_costs['total'],
+                                    'total_cost': total_cost,
                                     'level': level + 1,
                                     'cash_after': cash,
+                                    'free_capital_after': free_capital - total_cost,
                                     'position_size_after': current_position_size
                                 })
                                 averaging_done = True
@@ -402,7 +524,7 @@ class EnhancedRSIStrategyV2:
                         continue
             
             # PRIORITY 2: Entry logic - find RSI candidates (only if no averaging done)
-            if not averaging_done and cash >= self.min_position_size:
+            if not averaging_done and free_capital >= self.min_position_size:
                 rsi_candidates = []
                 for stock, data in stock_data.items():
                     if stock not in portfolio and stock not in corona_stocks:
@@ -421,29 +543,37 @@ class EnhancedRSIStrategyV2:
                     try:
                         entry_price = stock_data[stock_to_buy].loc[date, 'close']
                         if pd.notna(entry_price) and entry_price > 0:
-                            # Calculate shares and investment amount
-                            quantity, investment_amount = self.calculate_investment_amount(entry_price, current_position_size)
+                            # Calculate shares and investment using free capital
+                            quantity, investment_amount, buy_costs = self.calculate_investment_amount(
+                                entry_price, current_position_size, free_capital
+                            )
                             
-                            if quantity > 0 and investment_amount <= cash:
+                            total_cost = investment_amount + buy_costs['total']
+                            
+                            if quantity > 0 and total_cost <= free_capital:
                                 portfolio[stock_to_buy] = {
                                     'quantity': quantity,
                                     'avg_price': entry_price,
-                                    'total_invested': investment_amount,
+                                    'total_invested': total_cost,  # Include all costs in cost basis
                                     'averaging_attempts': 0,
                                     'first_buy_date': date
                                 }
                                 
-                                cash -= investment_amount
+                                cash -= total_cost  # Deduct total cost including trading costs
+                                total_trading_costs += buy_costs['total']
+                                
                                 monthly_trades[month_key]['buys'] += 1
                                 monthly_trades[month_key]['new_entries'] += 1
-                                monthly_trades[month_key]['invested'] += investment_amount
+                                monthly_trades[month_key]['invested'] += total_cost
                                 
                                 # Add detailed entry info
                                 entry_details = {
                                     'stock': stock_to_buy,
                                     'entry_price': entry_price,
                                     'quantity': quantity,
-                                    'amount': investment_amount,
+                                    'gross_amount': investment_amount,
+                                    'trading_costs': buy_costs,
+                                    'total_cost': total_cost,
                                     'date': date,
                                     'rsi': rsi_value,
                                     'reason': f'NEW_ENTRY (RSI: {rsi_value:.2f} < {self.entry_rsi})'
@@ -457,8 +587,11 @@ class EnhancedRSIStrategyV2:
                                     'price': entry_price,
                                     'return': 0,
                                     'reason': 'NEW_ENTRY',
-                                    'amount': investment_amount,
+                                    'gross_amount': investment_amount,
+                                    'trading_costs': buy_costs['total'],
+                                    'total_cost': total_cost,
                                     'cash_after': cash,
+                                    'free_capital_after': free_capital - total_cost,
                                     'position_size_after': current_position_size
                                 })
                     except:
@@ -497,6 +630,10 @@ class EnhancedRSIStrategyV2:
             except:
                 continue
         
+        # Calculate locked vs free capital at the end
+        locked_capital = sum([holdings['total_invested'] for holdings in portfolio.values()])
+        free_capital = cash - locked_capital
+        
         return {
             'initial_capital': self.initial_capital,
             'final_value': final_portfolio_value,
@@ -511,6 +648,10 @@ class EnhancedRSIStrategyV2:
             'monthly_portfolios': monthly_portfolios,
             'final_position_size': current_position_size,
             'cash': cash,
+            'locked_capital': locked_capital,
+            'free_capital': free_capital,
+            'total_realized_profits': total_realized_profits,
+            'total_trading_costs': total_trading_costs,
             'portfolio': portfolio,
             'stock_data': stock_data  # Keep reference to stock data for reporting
         }
@@ -536,6 +677,14 @@ Active Positions      : {results['active_positions']}
 Available Cash        : ₹{results['cash']:,.0f}
 Final Position Size   : ₹{results['final_position_size']:,.0f}
 
+💰 CAPITAL MANAGEMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━
+Total Realized Profits: ₹{results['total_realized_profits']:,.0f}
+Total Trading Costs   : ₹{results['total_trading_costs']:,.0f}
+Locked Capital        : ₹{results['locked_capital']:,.0f}
+Free Capital          : ₹{results['free_capital']:,.0f}
+Capital Efficiency    : {(results['locked_capital']/results['final_value']*100):.1f}% deployed
+
 🎯 TRADING STATISTICS:
 ━━━━━━━━━━━━━━━━━━━━━━━━
 Total Trades          : {results['total_trades']}
@@ -543,6 +692,7 @@ Profitable Trades     : {results['profitable_trades']}
 Corona Trades         : {results['corona_trades']}
 Corona Stocks         : {results['corona_stocks']}
 Win Rate              : {win_rate:.1f}%
+Avg Trading Cost/Trade: ₹{(results['total_trading_costs']/max(1, results['total_trades'])):.0f}
 """
         
         results_content += "\n📅 MONTH-BY-MONTH TRADE ANALYSIS:\n"
@@ -631,8 +781,16 @@ Win Rate              : {win_rate:.1f}%
         report += "📈 NEW STOCK ENTRIES (DETAILED):\n"
         if trades['detailed_entries']:
             for i, entry in enumerate(sorted(trades['detailed_entries'], key=lambda x: x['date']), 1):
-                report += f"    {i}. {entry['stock']:<12} | Entry: ₹{entry['entry_price']:7.2f} | Qty: {entry['quantity']:4d} | Amount: ₹{entry['amount']:8.0f} | "
+                total_cost = entry.get('total_cost', entry.get('amount', entry.get('gross_amount', 0)))
+                report += f"    {i}. {entry['stock']:<12} | Entry: ₹{entry['entry_price']:7.2f} | Qty: {entry['quantity']:4d} | Total Cost: ₹{total_cost:8.0f} | "
                 report += f"Date: {entry['date'].strftime('%Y-%m-%d')} | RSI: {entry['rsi']:5.2f} | {entry['reason']}\n"
+                
+                # Show cost breakdown if available
+                if 'trading_costs' in entry:
+                    costs = entry['trading_costs']
+                    if isinstance(costs, dict) and costs.get('total', 0) > 0:
+                        report += f"       Costs: Brokerage: ₹{costs.get('brokerage', 0):.2f}, STT: ₹{costs.get('stt', 0):.2f}, "
+                        report += f"Stamp: ₹{costs.get('stamp_duty', 0):.2f}, Slippage: ₹{costs.get('slippage', 0):.2f}\n"
         else:
             report += "   • No new entries this month\n"
         
@@ -642,8 +800,16 @@ Win Rate              : {win_rate:.1f}%
         report += "🔄 AVERAGING TRADES (DETAILED):\n"
         if trades['detailed_averaging']:
             for i, avg in enumerate(sorted(trades['detailed_averaging'], key=lambda x: x['date']), 1):
-                report += f"    {i}. {avg['stock']:<12} | Entry: ₹{avg['entry_price']:7.2f} | Qty: {avg['quantity']:4d} | Amount: ₹{avg['amount']:8.0f} | "
+                total_cost = avg.get('total_cost', avg.get('amount', avg.get('gross_amount', 0)))
+                report += f"    {i}. {avg['stock']:<12} | Entry: ₹{avg['entry_price']:7.2f} | Qty: {avg['quantity']:4d} | Total Cost: ₹{total_cost:8.0f} | "
                 report += f"Date: {avg['date'].strftime('%Y-%m-%d')} | RSI: {avg['rsi']:5.2f} | Level: {avg['level']} | {avg['reason']}\n"
+                
+                # Show cost breakdown if available
+                if 'trading_costs' in avg:
+                    costs = avg['trading_costs']
+                    if isinstance(costs, dict) and costs.get('total', 0) > 0:
+                        report += f"       Costs: Brokerage: ₹{costs.get('brokerage', 0):.2f}, STT: ₹{costs.get('stt', 0):.2f}, "
+                        report += f"Stamp: ₹{costs.get('stamp_duty', 0):.2f}, Slippage: ₹{costs.get('slippage', 0):.2f}\n"
         else:
             report += "   • No averaging trades this month\n"
         
@@ -652,13 +818,28 @@ Win Rate              : {win_rate:.1f}%
         # Profit bookings
         report += "💰 PROFIT BOOKINGS (DETAILED):\n"
         if trades['detailed_exits']:
-            total_profit = sum([exit['profit'] for exit in trades['detailed_exits']])
-            report += f"   Total Profit This Month: ₹{total_profit:,.2f}\n\n"
+            total_realized_profit = sum([exit.get('realized_profit', exit.get('profit', 0)) for exit in trades['detailed_exits']])
+            total_gross_profit = sum([exit.get('gross_profit', exit.get('profit', 0)) for exit in trades['detailed_exits']])
+            report += f"   Total Gross Profit This Month: ₹{total_gross_profit:,.2f}\n"
+            report += f"   Total Realized Profit This Month: ₹{total_realized_profit:,.2f}\n\n"
             
             for i, exit in enumerate(sorted(trades['detailed_exits'], key=lambda x: x['sell_date']), 1):
-                report += f"    {i}. {exit['stock']:<12} | Buy: ₹{exit['buy_price']:7.2f} | Sell: ₹{exit['sell_price']:7.2f} | Qty: {exit['quantity']:4d} | Profit: ₹{exit['profit']:7.2f} ({exit['return_pct']:+6.2f}%)\n"
-                report += f"       Buy Date: {exit['buy_date'].strftime('%Y-%m-%d')} | Sell Date: {exit['sell_date'].strftime('%Y-%m-%d')} | Hold: {exit['hold_days']:3d} days | Tax: ₹{exit['tax']:.2f}\n"
-                report += f"       Invested: ₹{exit['invested']:8.0f} | Gross: ₹{exit['gross']:8.0f} | Net: ₹{exit['net']:8.0f} | {exit['reason']}\n\n"
+                gross_profit = exit.get('gross_profit', exit.get('profit', 0))
+                realized_profit = exit.get('realized_profit', exit.get('profit', 0))
+                trading_costs = exit.get('trading_costs', {})
+                
+                report += f"    {i}. {exit['stock']:<12} | Buy: ₹{exit['buy_price']:7.2f} | Sell: ₹{exit['sell_price']:7.2f} | Qty: {exit['quantity']:4d}\n"
+                report += f"       Gross Profit: ₹{gross_profit:7.2f} | Realized Profit: ₹{realized_profit:7.2f} ({exit['return_pct']:+6.2f}%)\n"
+                report += f"       Buy Date: {exit['buy_date'].strftime('%Y-%m-%d')} | Sell Date: {exit['sell_date'].strftime('%Y-%m-%d')} | Hold: {exit['hold_days']:3d} days\n"
+                
+                if isinstance(trading_costs, dict) and trading_costs.get('total', 0) > 0:
+                    report += f"       Tax: ₹{exit['tax']:.2f} | Trading Costs: ₹{trading_costs['total']:.2f}\n"
+                else:
+                    report += f"       Tax: ₹{exit['tax']:.2f}\n"
+                
+                gross_proceeds = exit.get('gross_proceeds', exit.get('gross', 0))
+                net_proceeds = exit.get('net_proceeds', exit.get('net', 0))
+                report += f"       Invested: ₹{exit['invested']:8.0f} | Gross: ₹{gross_proceeds:8.0f} | Net: ₹{net_proceeds:8.0f} | {exit['reason']}\n\n"
         else:
             report += "   • No profit bookings this month\n"
         
